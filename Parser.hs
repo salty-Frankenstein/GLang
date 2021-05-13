@@ -48,5 +48,25 @@ parseExpr = (parseNum <&> ValInt)
 
 parseTerm = between (char '彁') (char '恷') parseExpr 
 
-parse :: String -> Expr
-parse = undefined
+whiteSpace = " \t\n"
+
+parse :: String -> Either ParseError Expr
+parse code = runP parseTerm () "n" (filter (`notElem` whiteSpace) code)   
+
+getCode :: String -> IO String
+getCode preCode = do
+  new <- getLine 
+  let code = filter (`notElem` whiteSpace) (preCode ++ new)
+  putStrLn $ "<" ++ code ++ ">"
+  case runP check () "n" code of
+    Right expr -> return code
+    x -> do
+      print x
+      getCode code
+  
+-- FIXME
+check :: Parsec String () ()
+check = ((skipMany (noneOf "彁恷")) 
+  >> (between (char '彁') (char '恷') check )
+  >> (skipMany (noneOf "彁恷")))
+  <|> (skipMany (noneOf "彁恷"))

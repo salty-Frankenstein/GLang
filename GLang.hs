@@ -1,11 +1,16 @@
 module GLang where
 
 import Parser
-import Text.Parsec
+import AST
+import System.Environment
 
 main :: IO ()
 main = do
-  code <- getLine
-  print code
-  print $ runP parseTerm () "n" code  
-  return ()
+  args <- getArgs 
+  case args of
+    [path] -> do
+      code <- readFile path
+      case parse code of
+        Right e -> runInterpreter e >>= print
+        _ -> return ()
+    _ -> error "argument error"

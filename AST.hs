@@ -2,7 +2,7 @@
 
 module AST where
 
-import Text.Parsec
+import Control.Monad.State
 
 type Name = String
 
@@ -22,11 +22,13 @@ data ExprT
   | SBool Bool
   | SName Name
   | SFunc FuncT
+  | SNil
 
 instance Show ExprT where
   show (SInt i) = show i
   show (SBool b) = if b then "#t" else "#f"
   show (SFunc _) = "<function>"
+  show SNil = "nil"
 
 data Expr
   = ValInt Int
@@ -39,18 +41,37 @@ data Expr
   | Lambda (Name, Expr)
   | Apply Expr Expr
   | Let (Name, Expr) Expr
-  deriving Show
+  -- stmts
+  | Assign (Name, Expr)
+  | Ignore Expr
+  | Do [Expr] -- do block
+  deriving (Show)
 
--- evalExpr :: Expr a -> a
--- evalExpr (ValInt i) = i
--- evalExpr (ValBool b) = b
--- evalExpr (Add e1 e2) = evalExpr e1 + evalExpr e2
--- evalExpr (Sub e1 e2) = evalExpr e1 - evalExpr e2
--- evalExpr (Mul e1 e2) = evalExpr e1 * evalExpr e2
--- evalExpr (Div e1 e2) = evalExpr e1 `div` evalExpr e2
+  
+{- interpret state monad -}
+type InterpretM = StateT Environment IO
 
-interpret :: Expr -> Environment -> ExprT
-interpret e env =
+interpret :: Expr -> InterpretM ExprT
+interpret (Assign (name, expr)) = do
+  env <- get 
+  let val = eval expr env   -- eager eval
+  put $ envExt (name, val) env
+  return SNil
+interpret (Do b) = do
+  oldEnv <- get
+  mapM_ interpret b
+  put oldEnv
+  return SNil
+
+interpret (Ignore expr) = undefined 
+
+interpret e = gets $ eval e
+
+runInterpreter :: Expr -> IO ExprT
+runInterpreter e = evalStateT (interpret e) env0
+
+eval :: Expr -> Environment -> ExprT
+eval e env =
   case e of
     ValName n ->
       case lookup n env of
@@ -60,27 +81,27 @@ interpret e env =
     ValBool b -> SBool b
     l@Lambda {} -> SFunc (l, env)
     Let (n, e1) e2 ->
-      let v1 = interpret e1 env
-       in interpret e2 (envExt (n, v1) env)
+      let v1 = eval e1 env
+       in eval e2 (envExt (n, v1) env)
     Apply f x ->
-      case interpret f env of
+      case eval f env of
         SFunc (Lambda (name, e), envSave) ->
-          let v2 = interpret x env
-           in interpret e (envExt (name, v2) envSave)
+          let v2 = eval x env
+           in eval e (envExt (name, v2) envSave)
         _ -> error "this expression is not callable"
     Add e1 e2 ->
-      let (SInt i1) = interpret e1 env
-          (SInt i2) = interpret e2 env
+      let (SInt i1) = eval e1 env
+          (SInt i2) = eval e2 env
        in SInt (i1 + i2)
     Sub e1 e2 ->
-      let (SInt i1) = interpret e1 env
-          (SInt i2) = interpret e2 env
+      let (SInt i1) = eval e1 env
+          (SInt i2) = eval e2 env
        in SInt (i1 - i2)
     Mul e1 e2 ->
-      let (SInt i1) = interpret e1 env
-          (SInt i2) = interpret e2 env
+      let (SInt i1) = eval e1 env
+          (SInt i2) = eval e2 env
        in SInt (i1 * i2)
     Div e1 e2 ->
-      let (SInt i1) = interpret e1 env
-          (SInt i2) = interpret e2 env
+      let (SInt i1) = eval e1 env
+          (SInt i2) = eval e2 env
        in SInt (i1 `div` i2)
