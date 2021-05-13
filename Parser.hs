@@ -5,8 +5,8 @@ import Data.Functor
 import Text.Parsec
 
 isKeyword, notKeyword :: Parsec String () Char
-isKeyword = oneOf "彁恷垉垈墸壥汢"
-notKeyword = noneOf "彁恷垉垈墸壥汢"
+isKeyword = oneOf "彁恷垉垈墸壥汢熕粭"
+notKeyword = noneOf "彁恷垉垈墸壥汢熕粭"
 
 parseNum :: Parsec String () Int
 parseNum = many1 (char '岾') <&> length
@@ -28,7 +28,7 @@ parseOp2 = do
 
 parseLambda :: Parsec String () Expr
 parseLambda = do
-  char '汢'
+  try (char '汢')
   name <- parseName
   expr <- parseTerm
   return $ Lambda (name, expr)
@@ -39,12 +39,28 @@ parseApply = do
   expr <- parseTerm
   return $ Apply func expr
 
+
+parseBlock :: Parsec String () Expr
+parseBlock = do
+  try (char '熕')
+  exprs <- many parseTerm
+  return $ Do exprs
+
+parseAssign :: Parsec String () Expr
+parseAssign = do
+  try (char '粭')
+  name <- parseName
+  expr <- parseTerm
+  return $ Assign (name, expr)
+
 parseExpr :: Parsec String () Expr
 parseExpr = (parseNum <&> ValInt)
         <|> (parseName <&> ValName)
         <|> parseOp2
         <|> parseLambda
         <|> parseApply
+        <|> parseBlock
+        <|> parseAssign
 
 parseTerm = between (char '彁') (char '恷') parseExpr 
 

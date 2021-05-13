@@ -12,3 +12,12 @@
 
 ### Lambda Functions
 `彁汢<Name><Expr>恷`
+
+### Assign
+`彁粭<Name><Expr>恷`
+
+### Block
+`彁熕<Expr1><Expr2>...恷`
+
+### if expression
+`彁挧<condition><then expr><else expr>恷`
