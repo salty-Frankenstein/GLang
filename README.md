@@ -9,6 +9,7 @@
 `垈`: for `-`
 `墸`: for `*`
 `壥`: for `/`
+`暃`: for `==`
 
 ### Lambda Functions
 `彁汢<Name><Expr>恷`

@@ -4,15 +4,17 @@ import AST
 import Data.Functor
 import Text.Parsec
 
+keyword = "彁恷垉垈墸壥汢熕粭挧暃"
+
 isKeyword, notKeyword :: Parsec String () Char
-isKeyword = oneOf "彁恷垉垈墸壥汢熕粭"
-notKeyword = noneOf "彁恷垉垈墸壥汢熕粭"
+isKeyword = oneOf keyword
+notKeyword = noneOf keyword
 
 parseNum :: Parsec String () Int
 parseNum = many1 (char '岾') <&> length
 
 parseName :: Parsec String () Name
-parseName = many1 notKeyword
+parseName = try (many1 notKeyword)
 
 parseOp2 :: Parsec String () Expr
 parseOp2 = do
@@ -25,7 +27,8 @@ parseOp2 = do
             <|> (char '垈' >> return Sub)
             <|> (char '墸' >> return Mul)
             <|> (char '壥' >> return Div)
-
+            <|> (char '暃' >> return Eq)
+            
 parseLambda :: Parsec String () Expr
 parseLambda = do
   try (char '汢')
@@ -39,6 +42,13 @@ parseApply = do
   expr <- parseTerm
   return $ Apply func expr
 
+
+parseIf = do
+  try (char '挧')
+  cond <- parseTerm
+  expr1 <- parseTerm
+  expr2 <- parseTerm
+  return $ If cond expr1 expr2
 
 parseBlock :: Parsec String () Expr
 parseBlock = do
@@ -61,6 +71,7 @@ parseExpr = (parseNum <&> ValInt)
         <|> parseApply
         <|> parseBlock
         <|> parseAssign
+        <|> parseIf
 
 parseTerm = between (char '彁') (char '恷') parseExpr 
 

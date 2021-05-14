@@ -115,33 +115,4 @@ eval e env =
       let (SInt i1) = eval e1 env
           (SInt i2) = eval e2 env
        in SBool (i1 == i2)
-x = Do [
-    Assign ("f", Lambda ("x", 
-         ValInt 1 `Add`
-         Apply (ValName "f") (ValName "x" `Sub` ValInt 1 ))
-      )
-    -- , ValName "f"
-    ,Apply (ValName "f") (ValInt 2)
-  ]
-
-xx = Apply (ValName "x") (ValName "x")
-fxx = Apply (ValName "f") xx
-lxfxx = Lambda ("x", fxx)
-
-y = Lambda ("f",
-    Apply lxfxx lxfxx
-  )
-
-fact = Lambda ("f",
-    Lambda ("n", 
-      If (ValName "n" `Eq` ValInt 0) 
-        (ValInt 1)
-        (ValName "n" `Mul` 
-          Apply (ValName "f") (ValName "n" `Sub` ValInt 1))
-    )
-  )
-  
-t = Do [
-    Assign ("y", y),
-    Apply (Apply (ValName "y") fact) (ValInt 4)
-  ]
+       
