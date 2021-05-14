@@ -3,6 +3,7 @@
 module AST where
 
 import Control.Monad.State
+import Data.Char
 
 type Name = String
 
@@ -34,17 +35,20 @@ data Expr
   = ValInt Int
   | ValBool Bool
   | ValName Name
+  | ValNil
   | Add Expr Expr
   | Sub Expr Expr
   | Mul Expr Expr
   | Div Expr Expr
   | Eq Expr Expr
+  | Null Expr
   | Lambda (Name, Expr)
   | Apply Expr Expr
   | Let (Name, Expr) Expr
   | If Expr Expr Expr
   -- stmts
   | Assign (Name, Expr)
+  | PutChar Expr
   | Ignore Expr
   | Do [Expr] -- do block
   deriving (Show)
@@ -55,64 +59,93 @@ type InterpretM = StateT Environment IO
 
 interpret :: Expr -> InterpretM ExprT
 interpret (Assign (name, expr)) = do
+  val <- interpret expr    -- eager eval
+  modify $ envExt (name, val)
+  return SNil
+interpret (PutChar e) = do
   env <- get 
-  let val = eval expr env   -- eager eval
-  put $ envExt (name, val) env
+  SInt c <- interpret e 
+  lift $ putChar (chr c)
   return SNil
 interpret (Do b) = do
   oldEnv <- get
   res <- mapM interpret b
-  get >>= lift.print
+  -- get >>= lift.print
   put oldEnv
   return $ last res
 
 interpret (Ignore expr) = undefined 
 
-interpret e = gets $ eval e
+interpret (ValName n) = do
+  env <- get
+  case lookup n env of
+    Just x -> return x
+    Nothing -> error $ "undefined variable " ++ show n
+    
+interpret (ValInt i) = return $ SInt i
+interpret (ValBool b) = return $ SBool b
+interpret ValNil = return SNil
+
+interpret l@Lambda {} = do
+  env <- get
+  return $ SFunc (l, env)
+  
+interpret (Let (n, e1) e2) = do
+  env <- get 
+  v1 <- interpret e1 
+  put $ envExt (n, v1) env
+  interpret e2
+  
+interpret (Apply f x) = do
+  env <- get
+  func <- interpret' f env
+  case func of
+    SFunc (Lambda (name, e), envSave) -> do
+      v2 <- interpret' x env
+      interpret' e (envExt (name, v2) envSave)
+    _ -> error "this expression is not callable"
+  where
+    interpret' e env = do
+      oldEnv <- get
+      put env
+      res <- interpret e
+      put oldEnv
+      return res
+      
+interpret (If cond expr1 expr2) = do
+  SBool b <- interpret cond
+  if b then interpret expr1 else interpret expr2 
+
+interpret (Add e1 e2) = do
+  SInt i1 <- interpret e1
+  SInt i2 <- interpret e2
+  return $ SInt (i1 + i2)
+  
+interpret (Sub e1 e2) = do
+  SInt i1 <- interpret e1
+  SInt i2 <- interpret e2
+  return $ SInt (i1 - i2)
+  
+interpret (Mul e1 e2) = do
+  SInt i1 <- interpret e1
+  SInt i2 <- interpret e2
+  return $ SInt (i1 * i2)
+  
+interpret (Div e1 e2) = do
+  SInt i1 <- interpret e1
+  SInt i2 <- interpret e2
+  return $ SInt (i1 `div` i2)
+  
+interpret (Eq e1 e2) = do
+  SInt i1 <- interpret e1
+  SInt i2 <- interpret e2
+  return $ SBool (i1 == i2)
+  
+interpret (Null e) = do
+  res <- interpret e
+  case res of
+    SNil -> return $ SBool True 
+    _ -> return $ SBool False
 
 runInterpreter :: Expr -> IO ExprT
 runInterpreter e = evalStateT (interpret e) env0
-
-eval :: Expr -> Environment -> ExprT
-eval e env =
-  case e of
-    ValName n ->
-      case lookup n env of
-        Just x -> x
-        Nothing -> error $ "undefined variable " ++ show n
-    ValInt i -> SInt i
-    ValBool b -> SBool b
-    l@Lambda {} -> SFunc (l, env)
-    Let (n, e1) e2 ->
-      let v1 = eval e1 env
-       in eval e2 (envExt (n, v1) env)
-    Apply f x ->
-      case eval f env of
-        SFunc (Lambda (name, e), envSave) ->
-          let v2 = eval x env
-           in eval e (envExt (name, v2) envSave)
-        _ -> error "this expression is not callable"
-    If cond expr1 expr2 ->
-      let (SBool b) = eval cond env
-       in if b then eval expr1 env else eval expr2 env
-    Add e1 e2 ->
-      let (SInt i1) = eval e1 env
-          (SInt i2) = eval e2 env
-       in SInt (i1 + i2)
-    Sub e1 e2 ->
-      let (SInt i1) = eval e1 env
-          (SInt i2) = eval e2 env
-       in SInt (i1 - i2)
-    Mul e1 e2 ->
-      let (SInt i1) = eval e1 env
-          (SInt i2) = eval e2 env
-       in SInt (i1 * i2)
-    Div e1 e2 ->
-      let (SInt i1) = eval e1 env
-          (SInt i2) = eval e2 env
-       in SInt (i1 `div` i2)
-    Eq e1 e2 ->
-      let (SInt i1) = eval e1 env
-          (SInt i2) = eval e2 env
-       in SBool (i1 == i2)
-       

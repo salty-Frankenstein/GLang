@@ -13,7 +13,7 @@ repl = do
   else do
     let res = parse code
     case res of
-      Right expr -> print $ eval expr env0
+      Right expr -> runInterpreter expr >>= print
       err -> print err
     repl
 

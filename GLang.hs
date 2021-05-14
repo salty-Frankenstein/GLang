@@ -11,6 +11,10 @@ main = do
     [path] -> do
       code <- readFile path
       case parse code of
-        Right e -> runInterpreter e >>= print
+        Right e -> do
+          res <- runInterpreter e
+          case res of
+            SNil -> return ()
+            r -> print r
         _ -> return ()
     _ -> error "argument error"
